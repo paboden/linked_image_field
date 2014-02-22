@@ -1,0 +1,6 @@
+name = Linked image CUSTOM
+description = Defines an image field with a link url type that displays an image linked to the url. Images are can be displayed as a single, a list, or slideshow.
+dependencies[] = field
+dependencies[] = image
+package = Fields
+core = 7.x
