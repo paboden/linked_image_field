@@ -1,6 +1,0 @@
-name = Image with link
-description = Defines an image field with a link url type that displays an image linked to the url.
-dependencies[] = field
-dependencies[] = image
-package = Fields
-core = 7.x
