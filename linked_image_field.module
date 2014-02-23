@@ -305,15 +305,9 @@ function linked_image_field_field_formatter_settings_form($field, $instance, $vi
     //remove image link option from Linked image "Linked image (default)" formatter. We are already setting the link for this, silly :)
     $element = image_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
     unset($element['image_link']);
-  }
-
-/*
-  if ($display['type'] == 'linked_image_field_slideshow') {
-    //remove image link option from Linked image "slideshow" formatter. We are already setting the link for this, silly :)
-    $element = field_slideshow_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
     unset($element['slideshow_link']);
   }
-*/
+
   return $element;
 }
 
@@ -341,25 +335,12 @@ function linked_image_field_field_formatter_settings_summary($field, $instance, 
 
 }
 
-
-
-
-
-
-
-
-
 /**
  * Implements hook_field_formatter_view().
  */
 function linked_image_field_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
   $settings = $display['settings'];
-
-  dpm($field);
-  dpm($field['type']);
-  dpm($instance);
-  dpm($display);
 
   switch ($display['type']) {
     case 'linked_image_field':
@@ -377,52 +358,9 @@ function linked_image_field_field_formatter_view($entity_type, $entity, $field, 
         );
       }
       break;
-
-    case 'slideshow':
-      foreach ($items as $delta => $item) {
-        // Set default values for empty elements.
-        _linked_image_field_format_set_attribute('url', $item, $instance);
-        _linked_image_field_format_set_attribute('alt', $item, $instance);
-        _linked_image_field_format_set_attribute('title', $item, $instance);
-        _linked_image_field_format_set_attribute('target', $item, $instance);
-
-        $element[$delta] = array(
-          '#theme' => 'linked_image_field_formatter',
-          '#item' => $item,
-          '#image_style' => $display['settings']['image_style'],
-        );
-      }
-      break;
-  }
-
-
-/*
-  if ($field['type'] == 'linked_image_field') {
-    foreach ($items as $delta => $item) {
-      // Set default values for empty elements.
-      _linked_image_field_format_set_attribute('url', $item, $instance);
-      _linked_image_field_format_set_attribute('alt', $item, $instance);
-      _linked_image_field_format_set_attribute('title', $item, $instance);
-      _linked_image_field_format_set_attribute('target', $item, $instance);
-
-      $element[$delta] = array(
-        '#theme' => 'linked_image_field_formatter',
-        '#item' => $item,
-        '#image_style' => $display['settings']['image_style'],
-      );
     }
-  }
-*/
-
   return $element;
 }
-
-
-
-
-
-
-
 
 /**
  * Implements hook_theme().
@@ -534,11 +472,12 @@ function _linked_image_field_format_set_attribute($attr, &$item, $instance) {
   }
 }
 
+
 /**
  * Implements hook_field_formatter_info_alter().
  */
 function linked_image_field_field_formatter_info_alter(&$info) {
-  // Let a new field type re-use an existing formatter.
+  // Let a new field type re-use an existing formatter (let linked_image_field use the slideshow formatter).
   if (module_exists('field_slideshow')) {
     $info['slideshow']['field types'][] = 'linked_image_field';
   }
@@ -548,10 +487,22 @@ function linked_image_field_field_formatter_info_alter(&$info) {
  * Implements hook_field_formatter_settings_form_alter().
  */
 function linked_image_field_field_formatter_settings_form_alter(&$info) {
-  // Add a setting to a formatter type.
+  // Add a setting to a formatter type. Adds option for Linked image URL to the Slideshow link settings.
   if (module_exists('field_slideshow')) {
-    $info['slideshow_link']['#type'] = 'hidden';
-    $info['slideshow_link']['#default_value'] = 'linked_image_field';
     $info['slideshow_link']['#options']['linked_image_field'] = t('Linked image URL');
+  }
+}
+
+function linked_image_field_field_attach_view_alter(&$output, $context) {
+  foreach (element_children($output) as $field_name) {
+    $element = &$output[$field_name];
+    if ($element['#field_type'] == 'linked_image_field' && $element['#formatter'] == 'slideshow') {
+      foreach ($element['#items'] as $delta => $item) {
+        if (!empty($output[$field_name][0]['#items'][$delta]['url'])) {
+          $external_link = $output[$field_name][0]['#items'][$delta]['url'];
+          $output[$field_name][0]['#items'][$delta]['path']['path'] = $external_link;
+        }
+      }
+    }
   }
 }
