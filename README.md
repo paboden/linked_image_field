@@ -1,4 +1,4 @@
-linked image field
+Linked Image Field
 =====================
 
 This creates an image field with a url field (and additional options) for automatically creating an image that is linked to a url.
