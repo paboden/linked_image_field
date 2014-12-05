@@ -1,0 +1,24 @@
+div.image-preview {
+  float: left;
+  max-width: 40%;
+  padding: 0px;
+}
+
+div.image-preview img {
+  max-width: 100%;
+  height: auto;
+  padding: 0px;
+  margin: 0 auto;
+}
+
+div.image-widget-data {
+  float: left;
+  max-width: 55%;
+  padding: 0px;
+}
+
+div.image-widget-data .file,
+div.image-widget-data .form-item {
+  margin: 5px 10px !important;
+  white-space: normal;
+}

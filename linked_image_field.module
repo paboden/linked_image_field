@@ -9,6 +9,7 @@
  * Implements hook_field_info().
  */
 function linked_image_field_field_info() {
+  //drupal_add_css(drupal_get_path('module', 'linked_image_field') . '/css/linked-image-field.css');
   return array(
     'linked_image_field' => array(
       'label' => t('Linked Image'),
@@ -31,6 +32,8 @@ function linked_image_field_field_info() {
         'url' => '',
         'custom_target' => 0,
         'target' => '_self',
+        'default_image' => 0,
+        'options' => array(),
       ),
       'default_widget' => 'linked_image_field_widget',
       'default_formatter' => 'linked_image_field',
@@ -200,6 +203,7 @@ function linked_image_field_field_widget_settings_form($field, $instance) {
  * Implements hook_field_widget_form().
  */
 function linked_image_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  drupal_add_css(drupal_get_path('module', 'linked_image_field') . '/css/linked-image-field.css');
   $elements = image_field_widget_form($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
   foreach (element_children($elements) as $delta) {
     $elements[$delta]['#process'][] = 'linked_image_field_widget_process';
@@ -217,7 +221,6 @@ function linked_image_field_field_widget_form(&$form, &$form_state, $field, $ins
  * @return array
  */
 function linked_image_field_widget_process($element, &$form_state, $form) {
-
   $item = $element['#value'];
   $item['fid'] = $element['fid']['#value'];
 
@@ -272,6 +275,7 @@ function linked_image_field_widget_process($element, &$form_state, $form) {
     '#weight' => -1,
     '#access' => (bool) $item['fid'] && $settings['longdesc_field'],
   );
+
   return $element;
 }
 
@@ -279,7 +283,6 @@ function linked_image_field_widget_process($element, &$form_state, $form) {
  * Implements hook_field_formatter_info().
  */
 function linked_image_field_field_formatter_info() {
-
   $formatters = array(
     'linked_image_field' => array(
       'label' => t('Linked Image'),
@@ -371,6 +374,7 @@ function linked_image_field_theme() {
       'variables' => array(
         'item' => NULL,
         'path' => NULL,
+        'options' => NULL,
         'image_style' => NULL,
       ),
     ),
@@ -494,6 +498,7 @@ function linked_image_field_field_formatter_settings_form_alter(&$info) {
 }
 
 function linked_image_field_field_attach_view_alter(&$output, $context) {
+  drupal_add_css(drupal_get_path('module', 'linked_image_field') . '/css/linked-image-field.css');
   foreach (element_children($output) as $field_name) {
     $element = &$output[$field_name];
     if ($element['#field_type'] == 'linked_image_field' && $element['#formatter'] == 'slideshow') {
@@ -504,5 +509,145 @@ function linked_image_field_field_attach_view_alter(&$output, $context) {
         }
       }
     }
+  }
+}
+
+/**
+ * Implements template_preprocess().
+ */
+function linked_image_field_preprocess_field_slideshow(&$variables) {
+  // Add js variables
+  $js_variables = $variables["js_variables"];
+
+  drupal_add_js(array('field_slideshow' => array('field-slideshow-' . $variables['slideshow_id'] => $js_variables)), 'setting');
+
+  // Add the JQuery plugins and the JS code
+  if (module_exists('libraries')) {
+    $path = libraries_get_path('jquery.cycle');
+    if (file_exists($path . '/jquery.cycle.all.min.js')) drupal_add_js($path . '/jquery.cycle.all.min.js');
+    elseif (file_exists($path . '/jquery.cycle.all.js')) drupal_add_js($path . '/jquery.cycle.all.js');
+
+    if (isset($js_variables['pager']) && $js_variables['pager'] == 'carousel') {
+      $path = libraries_get_path('jquery.jcarousel');
+      if (file_exists($path . '/lib/jquery.jcarousel.min.js')) drupal_add_js($path . '/lib/jquery.jcarousel.min.js');
+      elseif (file_exists($path . '/lib/jquery.jcarousel.js')) drupal_add_js($path . '/lib/jquery.jcarousel.js');
+    }
+
+    $path = libraries_get_path('jquery.imagesloaded');
+    if (file_exists($path . '/jquery.imagesloaded.min.js')) drupal_add_js($path . '/jquery.imagesloaded.min.js');
+    elseif (file_exists($path . '/jquery.imagesloaded.js')) drupal_add_js($path . '/jquery.imagesloaded.js');
+
+    drupal_add_js(drupal_get_path('module', 'field_slideshow') . '/field_slideshow.js');
+  }
+
+  // Add css
+  drupal_add_css(drupal_get_path('module', 'field_slideshow') . '/field_slideshow.css');
+
+  // Generate classes
+  $variables['classes_array'][] = 'field-slideshow-' . $variables['slideshow_id'];
+  $variables['classes_array'][] = 'effect-' . $variables['js_variables']['fx'];
+  $variables['classes_array'][] = 'timeout-' . $variables['js_variables']['timeout'];
+  if (isset($variables['pager']) && $variables['pager'] != '') $variables['classes_array'][] = 'with-pager';
+  if (isset($variables['controls'])) $variables['classes_array'][] = 'with-controls';
+
+  // Change order if needed
+  if (isset($variables['order'])) {
+    if ($variables['order'] == 'reverse') $variables['items'] = array_reverse($variables['items']);
+    elseif ($variables['order'] == 'random') shuffle($variables['items']);
+  }
+
+  // Generate slides
+  $field_slideshow_zebra = 'odd';
+  $variables['slides_max_width'] = 0;
+  $variables['slides_max_height'] = 0;
+  $slide_theme = (isset($variables['breakpoints']) && isset($variables['breakpoints']['mapping']) && !empty($variables['breakpoints']['mapping'])) ? 'picture' : 'image_style';
+  foreach ($variables['items'] as $num => $item) {
+    // Generate classes
+    $classes = array('field-slideshow-slide', 'field-slideshow-slide-' . (1+$num));
+    $field_slideshow_zebra = ($field_slideshow_zebra == 'odd') ? 'even' : 'odd';
+    $classes[] = $field_slideshow_zebra;
+    if ($num == 0) $classes[] = 'first';
+    elseif ($num == count($variables['items']) - 1) $classes[] = 'last';
+    $variables['items'][$num]['classes'] = implode(' ', $classes);
+
+    // Generate the image html
+    $image = array();
+    $image['path'] = $item['uri'];
+    $image['attributes']['class'] = array('field-slideshow-image', 'field-slideshow-image-' . (1+$num));
+    $image['alt'] = isset($item['alt']) ? $item['alt'] : '';
+    if (isset($item['width']) && isset($item['height'])) {
+      $image['width'] = $item['width'];
+      $image['height'] = $item['height'];
+    }
+    else {
+      $image_dims = getimagesize($image['path']);
+      $image['width'] = $image_dims[0];
+      $image['height'] = $image_dims[1];
+    }
+    if (isset($item['title']) && drupal_strlen($item['title']) > 0) $image['title'] = $item['title'];
+    if (isset($variables['image_style']) && $variables['image_style'] != '') {
+      $image['style_name'] = $variables['image_style'];
+      $image['breakpoints'] = $variables['breakpoints'];
+      $variables['items'][$num]['image'] = theme($slide_theme, $image);
+    }
+    else {
+      $variables['items'][$num]['image'] = theme('image', $image);
+    }
+
+    // Get image sizes and keeps the bigger ones, so height is correctly calculated by Cycle
+    $dimensions = array(
+      'width' => $image['width'],
+      'height' => $image['height'],
+    );
+    if (isset($variables['image_style']) && $variables['image_style'] != '') {
+      if (function_exists('image_style_transform_dimensions')) {
+        image_style_transform_dimensions($image['style_name'], $dimensions);
+      }
+      // manual calculation if Drupal < 7.9 or image_style_transform_dimensions doesn't work
+      if (!function_exists('image_style_transform_dimensions') || !is_numeric($dimensions['width'])) {
+        $thumbnail_path = image_style_path($variables['image_style'], $image['path']);
+        // if thumbnail is not generated, do it, so we can get the dimensions
+        if (!file_exists($thumbnail_path)) {
+          image_style_create_derivative(image_style_load($variables['image_style']), $image['path'], $thumbnail_path);
+        }
+        $thumbnail_dims = getimagesize($thumbnail_path);
+        $dimensions = array(
+          'width' => $thumbnail_dims[0],
+          'height' => $thumbnail_dims[1],
+        );
+      }
+    }
+
+  // If the theme function hasn't added width and height attributes to the image, add them
+  if (strpos($variables['items'][$num]['image'], 'width=') === FALSE) {
+    $variables['items'][$num]['image'] = drupal_substr($variables['items'][$num]['image'], 0, -2) . "width=\"$dimensions[width]\" height=\"$dimensions[height]\" />";
+  }
+
+  // Keeps biggest dimensions
+  if ($dimensions['width'] > $variables['slides_max_width']) $variables['slides_max_width'] = $dimensions['width'];
+  if ($dimensions['height'] > $variables['slides_max_height']) $variables['slides_max_height'] = $dimensions['height'];
+
+    // Add links if needed
+    $links = array('path' => 'image');
+    if (isset($item['caption']) && $item['caption'] != '') $links['caption_path'] = 'caption';
+    // Loop thru required links (because image and caption can have different links)
+    foreach ($links as $link => $out) {
+      if (!empty($item[$link])) {
+        $path = isset($item[$link]['path']) ? $item[$link]['path'] : NULL ;
+        $options = isset($item[$link]['options']) ? $item[$link]['options'] : NULL;
+        // When displaying an image inside a link, the html option must be TRUE.
+        $options['html'] = TRUE;
+        // Generate differnet rel attribute for image and caption, so colorbox doesn't double the image list
+        if (isset($options['attributes']['rel'])) $options['attributes']['rel'] .= $out;
+        $options = array_merge($options, drupal_parse_url($path));
+        $variables['items'][$num][$out] = l($variables['items'][$num][$out], $options['path'], $options);
+      }
+    }
+  }
+
+  // Don't add controls if there's only one image
+  if (count($variables['items']) == 1) {
+    $variables['controls'] = '';
+    $variables['pager'] = '';
   }
 }
